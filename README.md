@@ -4,6 +4,12 @@
 
 This does not provide support for Discord's OAuth2.
 
+## Installation
+
+This library uses [caesium](https://github.com/lvh/caesium), a cryptography library for Clojure. This library requires the presence of [libsodium](https://doc.libsodium.org/), a native library, so make sure to install that.
+
+Clojars: TBA
+
 ## Usage
 
 Below is an example of a minimal Discord app that uses the library.
