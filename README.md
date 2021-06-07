@@ -8,7 +8,7 @@ This does not provide support for Discord's OAuth2.
 
 This library uses [caesium](https://github.com/lvh/caesium), a cryptography library for Clojure. This library requires the presence of [libsodium](https://doc.libsodium.org/), a native library, so make sure to install that.
 
-Clojars: TBA
+[![Clojars Project](https://img.shields.io/clojars/v/com.github.johnnyjayjay/ring-discord-auth.svg)](https://clojars.org/com.github.johnnyjayjay/ring-discord-auth)
 
 ## Usage
 
