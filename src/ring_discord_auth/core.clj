@@ -144,11 +144,11 @@
   This middleware must be in the hierarchy **before** the body is processed."
   [handler public-key]
   (let [public-key (cond-> public-key (string? public-key) hex->bytes)]
-    (fn [{:keys [body character-encoding method]
+    (fn [{:keys [body character-encoding request-method]
           {signature signature-header timestamp timestamp-header} :headers
           :or {character-encoding default-charset}
           :as request}]
-      (if (= method :post)
+      (if (= request-method :post)
         (if-let-all [sig-bytes (some-> signature hex->bytes)
                      time-bytes (some-> timestamp (encode character-encoding))
                      body-bytes (some-> body read-all-bytes)]
