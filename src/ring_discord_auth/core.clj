@@ -144,17 +144,23 @@
   This middleware must be in the hierarchy **before** the body is processed."
   [handler public-key]
   (let [public-key (cond-> public-key (string? public-key) hex->bytes)]
-    (fn [{:keys [body character-encoding request-method]
-          {signature signature-header timestamp timestamp-header} :headers
-          :or {character-encoding default-charset}
-          :as request}]
-      (if (= request-method :post)
-        (if-let-all [sig-bytes (some-> signature hex->bytes)
-                     time-bytes (some-> timestamp (encode character-encoding))
-                     body-bytes (some-> body read-all-bytes)]
-          (if (authentic? sig-bytes body-bytes time-bytes public-key character-encoding)
-            (with-open [is (io/input-stream body-bytes)]
-              (handler (assoc request :body is)))
-            {:status 401 :headers default-headers :body "Signature was not authentic."})
-          {:status 400 :headers default-headers :body "Missing body, signature or timestamp."})
-        {:status 405 :headers default-headers :body "Only POST requests are allowed"}))))
+    (fn
+      ([request respond raise]
+       (let [validator (wrap-authenticate identity public-key)
+             result (validator request)]
+         (if (:status result)
+           (respond result)
+           (handler result respond raise))))
+      ([{:keys [body character-encoding request-method]
+         {signature signature-header timestamp timestamp-header} :headers
+         :or {character-encoding default-charset}
+         :as request}]
+       (if (= request-method :post)
+         (if-let-all [sig-bytes (some-> signature hex->bytes)
+                      time-bytes (some-> timestamp (encode character-encoding))
+                      body-bytes (some-> body read-all-bytes)]
+           (if (authentic? sig-bytes body-bytes time-bytes public-key character-encoding)
+             (handler (assoc request :body (ByteArrayInputStream. body-bytes)))
+             {:status 401 :headers default-headers :body "Signature was not authentic."})
+           {:status 400 :headers default-headers :body "Missing body, signature or timestamp."})
+         {:status 405 :headers default-headers :body "Only POST requests are allowed"})))))
