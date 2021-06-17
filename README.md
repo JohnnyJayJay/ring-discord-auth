@@ -12,7 +12,7 @@ This library uses [caesium](https://github.com/lvh/caesium), a cryptography libr
 
 ## Usage
 
-Below is an example of a minimal Discord app that uses the library.
+Below is an example of a minimal Discord app that uses the library. Here, a synchronous handler is used, but the middleware also supports asynchronous handlers.
 
 ``` clojure
 (ns example.core
