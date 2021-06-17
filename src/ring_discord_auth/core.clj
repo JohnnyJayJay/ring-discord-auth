@@ -141,7 +141,9 @@
     - If not authentic, respond with status 401 (Unauthorized)
 
   The `public-key` is the public key of the corresponding Discord app. It may be given as a String or byte array.
-  This middleware must be in the hierarchy **before** the body is processed."
+  This middleware must be in the hierarchy **before** the body is processed.
+
+  This middleware supports both synchronous and asynchronous handlers."
   [handler public-key]
   (let [public-key (cond-> public-key (string? public-key) hex->bytes)]
     (fn
