@@ -1,8 +1,8 @@
-(defproject com.github.johnnyjayjay/ring-discord-auth "0.2.0"
+(defproject com.github.johnnyjayjay/ring-discord-auth "0.2.1"
   :description "Fast and secure ring middleware to verify ED-25519-signed Discord interactions"
   :url "https://github.com/JohnnyJayJay/ring-discord-auth"
-  :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
-            :url "https://www.eclipse.org/legal/epl-2.0/"}
+  :license {:name "MIT License"
+            :url "https://mit-license.org/"}
   :repositories [["releases" {:url "https://clojars.org"
                               :creds :gpg}]]
   :dependencies [[org.clojure/clojure "1.10.1"]
