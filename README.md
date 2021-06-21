@@ -6,7 +6,16 @@ This does not provide support for Discord's OAuth2.
 
 ## Installation
 
-This library uses [caesium](https://github.com/lvh/caesium), a cryptography library for Clojure. This library requires the presence of [libsodium](https://doc.libsodium.org/), a native library, so make sure to install that.
+This library uses [caesium](https://github.com/lvh/caesium), a cryptography library for Clojure. This library requires the presence of [libsodium](https://doc.libsodium.org/) version 1.0.18 or higher, a native library, so make sure to install that in your compilation/execution environment.
+
+Quick ways to install libsodium:
+- on Debian-based distros: `sudo apt update && sudo apt install libsodium-dev`
+- on Arch-based distros: `pacman -S libsodium`
+- on other Linux distros: it's probably also in your package manager
+
+Check the libsodium site for [official installation info](https://doc.libsodium.org/installation) and other systems like Windows.
+
+Then, you can add the library through the dependency below.
 
 [![Clojars Project](https://img.shields.io/clojars/v/com.github.johnnyjayjay/ring-discord-auth.svg)](https://clojars.org/com.github.johnnyjayjay/ring-discord-auth)
 
