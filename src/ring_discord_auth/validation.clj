@@ -104,7 +104,7 @@
 (defn generate-keypair
   "Generate Ed25519 key pair.
 
-  return {:private `Ed25519PrivateKeyParameters`
+  Return {:private `Ed25519PrivateKeyParameters`
           :public `Ed25519PublicKeyParameters`}"
   []
   (let [random (SecureRandom.)
@@ -139,10 +139,19 @@
 (defn verify
   "Verify signature for msg byte array.
 
-  Return true if valid signature and false if not."
+  Returns `true` if valid signature and `false` if not."
   [^Ed25519Signer signer msg-bytes signature]
   (.update signer msg-bytes 0 (alength msg-bytes))
   (.verifySignature signer signature))
+
+(defn verify-request
+  "Verify discord payload with app public-key, request body, signature and timestamp headers
+
+  Returns `true` if the message is authentic, `false` if not."
+  [public-key timestamp body signature]
+  (verify (new-verifier (Ed25519PublicKeyParameters. (hex->bytes public-key) 0))
+          (.getBytes (str timestamp body) "utf8")
+          (hex->bytes signature)))
 
 (defn authentic?
   "Checks whether a signature is authentic, given a message and a public key.
@@ -167,11 +176,3 @@
                 message-bytes (encode (str timestamp-string body-string) charset-name)]
      (authentic? signature-bytes message-bytes public-key-bytes)
      false)))
-
-(defn verify-request
-  "verify discord payload with app public-key,
-  request body, signature and timestamp headers"
-  [public-key timestamp body signature]
-  (verify (new-verifier (Ed25519PublicKeyParameters. (hex->bytes public-key) 0))
-          (.getBytes (str timestamp body) "utf8")
-          (hex->bytes signature)))
