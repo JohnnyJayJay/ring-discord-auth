@@ -6,6 +6,6 @@
   :repositories [["releases" {:url "https://clojars.org"
                               :creds :gpg}]]
   :dependencies [[org.clojure/clojure "1.10.1"]
-                 [caesium "0.14.0"]]
+                 [org.bouncycastle/bcprov-jdk15on "1.69"]]
   :global-vars {*warn-on-reflection* true}
   :repl-options {:init-ns ring-discord-auth.core})
