@@ -166,13 +166,16 @@
   Returns `true` if the message is authentic, `false` if not."
   ([signature-bytes message-bytes public-key-bytes]
    (verify (new-verifier (Ed25519PublicKeyParameters. public-key-bytes 0))
-           message-bytes
-           signature-bytes))
+            message-bytes
+            signature-bytes))
   ([signature body timestamp public-key charset-name]
    (if-let-all [signature-bytes (cond-> signature (not (bytes? signature)) hex->bytes)
                 public-key-bytes (cond-> public-key (not (bytes? public-key)) hex->bytes)
-                body-string (if (bytes? body) (slurp body) body)
-                timestamp-string (if (bytes? timestamp) (slurp timestamp) timestamp)
-                message-bytes (encode (str timestamp-string body-string) charset-name)]
-     (authentic? signature-bytes message-bytes public-key-bytes)
+                ^bytes body-bytes (cond-> body (string? body) (encode charset-name))
+                ^bytes timestamp-bytes (cond-> timestamp (string? timestamp) (encode charset-name))
+                message-bytes (byte-array (+ (alength timestamp-bytes) (alength body-bytes)))]
+     (do
+       (System/arraycopy timestamp-bytes 0 message-bytes 0 (alength timestamp-bytes))
+       (System/arraycopy body-bytes 0 message-bytes (alength timestamp-bytes) (alength body-bytes))
+       (authentic? signature-bytes message-bytes public-key-bytes))
      false)))

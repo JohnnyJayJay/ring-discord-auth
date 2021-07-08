@@ -4,12 +4,15 @@
             [ring-discord-auth.core :as interceptor]
             [ring-discord-auth.validation :as validation]))
 
-(defn build-request [timestamp body signature]
-  {:request-method :post
-   :headers {"x-signature-ed25519" signature
-             "x-signature-timestamp" timestamp}
-   :body (io/input-stream (.getBytes body))
-   :character-encoding "utf8"})
+(defn build-request
+  ([timestamp body signature]
+   (build-request timestamp body signature :post))
+  ([timestamp body signature method]
+   {:request-method method
+    :headers {"x-signature-ed25519" signature
+              "x-signature-timestamp" timestamp}
+    :body (io/input-stream (.getBytes body))
+    :character-encoding "utf8"}))
 
 (deftest verify-request-test
   (let [key-pair (validation/generate-keypair)
@@ -29,4 +32,15 @@
              (-> (interceptor-fn (build-request timestamp
                                                 (str body "hackedbody")
                                                 signature))
+                 (select-keys [:status :headers :body]))))
+      (is (= {:status 400, :headers {"Content-Type" "text/plain", "Allow" "POST"}, :body "Missing body, signature or timestamp."}
+             (-> (interceptor-fn (build-request nil
+                                                ""
+                                                nil))
+                 (select-keys [:status :headers :body]))))
+      (is (= {:status 405, :headers {"Content-Type" "text/plain", "Allow" "POST"}, :body "Only POST requests are allowed"}
+             (-> (interceptor-fn (build-request nil
+                                                ""
+                                                nil
+                                                :get))
                  (select-keys [:status :headers :body])))))))
