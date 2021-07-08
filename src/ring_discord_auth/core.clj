@@ -1,47 +1,14 @@
 (ns ring-discord-auth.core
   "Core namespace containing functions to handle bytes, encodings and Discord authentication"
   (:require [ring-discord-auth.validation :as validation])
-  (:import (java.io ByteArrayOutputStream ByteArrayInputStream InputStream)
-           (java.nio ByteBuffer)))
+  (:import (java.io ByteArrayInputStream)))
 
 (def signature-header "x-signature-ed25519")
 (def timestamp-header "x-signature-timestamp")
+(def default-charset "utf8")
+
 (def default-headers {"Content-Type" "text/plain"
                       "Allow" "POST"})
-
-(defmacro if-let-all
-  "Utility-macro - like `if-let`, but with multiple bindings that are all tested."
-  {:style/indent 1}
-  ([bindings then]
-   `(if-let-all ~bindings ~then nil))
-  ([bindings then else]
-   (assert (vector? bindings))
-   (let [amount (count bindings)]
-     (assert (= (rem amount 2) 0))
-     (assert (>= amount 2))
-     `(if-let [~(first bindings) ~(second bindings)]
-        ~(if (> amount 2)
-           `(if-let-all ~(subvec bindings 2) ~then ~else)
-           then)
-        ~else))))
-
-(defn read-all-bytes
-  "Reads all bytes from either an `InputStream` or a `ByteBuffer`.
-  If an `InputStream` is provided, it will be consumed, but not closed.
-  Returns its result as a *new* byte array."
-  ^bytes [input]
-  (condp instance? input
-    InputStream (let [bos (ByteArrayOutputStream.)]
-                  (loop [next (.read ^InputStream input)]
-                    (if (== next -1)
-                      (.toByteArray bos)
-                      (do
-                        (.write bos next)
-                        (recur (.read ^InputStream input))))))
-    ByteBuffer (let [len (.remaining ^ByteBuffer input)
-                     result (byte-array len)]
-                 (.get ^ByteBuffer input result)
-                 result)))
 
 (defn wrap-authenticate
   "Ring middleware to authenticate incoming requests according to the Discord specification.
@@ -59,24 +26,24 @@
 
   This middleware supports both synchronous and asynchronous handlers."
   [handler public-key]
-  (fn
-    ([request respond raise]
-     (let [validator (wrap-authenticate identity public-key)
-           result (validator request)]
-       (if (:status result)
-         (respond result)
-         (handler result respond raise))))
-    ([{:keys [body request-method]
-       {signature signature-header timestamp timestamp-header} :headers
-       :as request}]
-     (if (= request-method :post)
-       (if-let-all [public-key-hex public-key
-                    raw-body (read-all-bytes body)
-                    timestamp-hex timestamp
-                    signature-hex signature
-                    body (slurp raw-body)]
-                   (if (validation/verify-request public-key-hex timestamp-hex body signature-hex)
-                     (handler (assoc request :body (ByteArrayInputStream. raw-body)))
-                     {:status 401 :headers default-headers :body "Signature was not authentic."})
-                   {:status 400 :headers default-headers :body "Missing body, signature or timestamp."})
-       {:status 405 :headers default-headers :body "Only POST requests are allowed"}))))
+  (let [public-key (cond-> public-key (string? public-key) validation/hex->bytes)]
+    (fn
+      ([request respond raise]
+       (let [validator (wrap-authenticate identity public-key)
+             result (validator request)]
+         (if (:status result)
+           (respond result)
+           (handler result respond raise))))
+      ([{:keys [body character-encoding request-method]
+         {signature signature-header timestamp timestamp-header} :headers
+         :or {character-encoding default-charset}
+         :as request}]
+       (if (= request-method :post)
+         (validation/if-let-all [sig-bytes (some-> signature validation/hex->bytes)
+                                 time-bytes (some-> timestamp (validation/encode character-encoding))
+                                 body-bytes (some-> body validation/read-all-bytes)]
+           (if (validation/authentic? sig-bytes body-bytes time-bytes public-key character-encoding)
+             (handler (assoc request :body (ByteArrayInputStream. body-bytes)))
+             {:status 401 :headers default-headers :body "Signature was not authentic."})
+           {:status 400 :headers default-headers :body "Missing body, signature or timestamp."})
+         {:status 405 :headers default-headers :body "Only POST requests are allowed"})))))

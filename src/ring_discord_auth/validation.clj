@@ -1,12 +1,99 @@
 (ns ring-discord-auth.validation
-  (:require [clojure.string :as str])
-  (:import (java.security SecureRandom)
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            [clojure.test :refer [is]])
+  (:import (java.io ByteArrayOutputStream InputStream)
+           (java.nio ByteBuffer CharBuffer)
+           (java.nio.charset Charset UnsupportedCharsetException IllegalCharsetNameException CharsetEncoder)
+           (java.security SecureRandom)
+           (java.util Arrays)
            (org.bouncycastle.crypto.generators Ed25519KeyPairGenerator)
            (org.bouncycastle.crypto.params Ed25519KeyGenerationParameters Ed25519PrivateKeyParameters Ed25519PublicKeyParameters)
            (org.bouncycastle.crypto.signers Ed25519Signer)))
 
+(defmacro examples
+  "Macro to generate illustrative tests for a function based on input-output pairs.
+
+  `f` is the function to test.
+  `equals` is the function used to compare the expected and actual result.
+  Each example call is a sequence where the first n - 1 items are the inputs and the last item is the expected output."
+  {:style/indent 1}
+  [f equals & example-calls]
+  `(fn []
+     ~@(for [call example-calls
+             :let [in (drop-last call)
+                   out (last call)
+                   out-ev (eval out)]]
+         `(is (~equals (~f ~@in) ~out)))))
+
+(defmacro if-let-all
+  "Utility-macro - like `if-let`, but with multiple bindings that are all tested."
+  {:style/indent 1}
+  ([bindings then]
+   `(if-let-all ~bindings ~then nil))
+  ([bindings then else]
+   (assert (vector? bindings))
+   (let [amount (count bindings)]
+     (assert (= (rem amount 2) 0))
+     (assert (>= amount 2))
+     `(if-let [~(first bindings) ~(second bindings)]
+        ~(if (> amount 2)
+           `(if-let-all ~(subvec bindings 2) ~then ~else)
+           then)
+        ~else))))
+
+(defn read-all-bytes
+  "Reads all bytes from either an `InputStream` or a `ByteBuffer`.
+
+  If an `InputStream` is provided, it will be consumed, but not closed.
+  Returns its result as a *new* byte array."
+  {:test (examples read-all-bytes Arrays/equals
+                   [(ByteBuffer/allocate 0) #_=> (byte-array 0)]
+                   [(io/input-stream (byte-array [0x12 0xab 0x4f])) #_=> (byte-array [0x12 0xab 0x4f])]
+                   [(ByteBuffer/wrap (byte-array [0x67 0x2a 0x4b 0x23 0x5c]) 1 2) #_=> (byte-array [0x2a 0x4b])])}
+  ^bytes [input]
+  (condp instance? input
+    InputStream (let [bos (ByteArrayOutputStream.)]
+                  (loop [next (.read ^InputStream input)]
+                    (if (== next -1)
+                      (.toByteArray bos)
+                      (do
+                        (.write bos next)
+                        (recur (.read ^InputStream input))))))
+    ByteBuffer (let [len (.remaining ^ByteBuffer input)
+                     result (byte-array len)]
+                 (.get ^ByteBuffer input result)
+                 result)))
+
+(defn encode
+  "Encodes the given string to a byte array using the given charset/encoding.
+
+  Returns `nil` if the charset is not available or if it doesn't support encoding."
+  {:test (examples encode Arrays/equals
+                   ["Hello, world!", "utf8" #_=> (byte-array [0x48 0x65 0x6c 0x6c 0x6f 0x2c 0x20 0x77 0x6f 0x72 0x6c 0x64 0x21])]
+                   ["Another one", "unknown?" #_=> nil])}
+  ^bytes [^String str ^String charset-name]
+  (if-let-all [^Charset cs (try (Charset/forName charset-name) (catch UnsupportedCharsetException _ nil) (catch IllegalCharsetNameException _ nil))
+               ^CharsetEncoder encoder (try (.newEncoder cs) (catch UnsupportedOperationException _ nil))]
+              (when (.canEncode encoder str)
+                (read-all-bytes (.encode encoder (CharBuffer/wrap str))))))
+
+(defn hex->bytes
+  "Converts the given string representing a hexadecimal number to a byte array.
+  Each byte in the resulting array comes from 2 digits in the string.
+
+  If the string cannot be converted, returns `nil`"
+  ^bytes [^String hex-str]
+  (let [len (count hex-str)
+        result (byte-array (quot (inc len) 2))]
+    (try
+      (doseq [[i hex-part] (map-indexed vector (map (partial apply str) (partition-all 2 hex-str)))]
+        (aset result i (unchecked-byte (Short/parseShort hex-part 16))))
+      result
+      (catch NumberFormatException _ nil))))
+
 (defn bytes->hex
-  "convert byte array to hex string."
+  "Convert byte array to hex string."
   [^bytes byte-array]
   (let [hex [\0 \1 \2 \3 \4 \5 \6 \7 \8 \9 \a \b \c \d \e \f]]
     (letfn [(hexify-byte [b]
@@ -14,17 +101,9 @@
                 [(hex (bit-shift-right v 4)) (hex (bit-and v 0x0F))]))]
       (str/join (mapcat hexify-byte byte-array)))))
 
-(defn hex->bytes
-  "convert hex string to byte array."
-  [^String hex-string]
-  (letfn [(unhexify-2 [^Character c1 ^Character c2]
-            (unchecked-byte
-             (+ (bit-shift-left (Character/digit c1 16) 4)
-                (Character/digit c2 16))))]
-    (byte-array (map #(apply unhexify-2 %) (partition 2 hex-string)))))
-
 (defn generate-keypair
-  "generate Ed25519 key pair.
+  "Generate Ed25519 key pair.
+
   return {:private `Ed25519PrivateKeyParameters`
           :public `Ed25519PublicKeyParameters`}"
   []
@@ -36,32 +115,58 @@
      :public  (cast Ed25519PublicKeyParameters (.getPublic key-pair))}))
 
 (defn new-signer
-  "return new instance of `Ed25519Signer` initialized by private key"
+  "Return new instance of `Ed25519Signer` initialized by private key"
   [private-key]
   (let [signer (Ed25519Signer.)]
     (.init signer true private-key)
     signer))
 
 (defn sign
-  "generate signature for msg byte array.
-  return byte array with signature."
+  "Generate signature for msg byte array.
+
+  Return byte array with signature."
   [^Ed25519Signer signer msg-bytes]
   (.update signer msg-bytes 0 (alength msg-bytes))
   (.generateSignature signer))
 
 (defn new-verifier
-  "return new instance of `Ed25519Signer` initialized by public key."
+  "Return new instance of `Ed25519Signer` initialized by public key."
   [public-key]
   (let [signer (Ed25519Signer.)]
     (.init signer false public-key)
     signer))
 
 (defn verify
-  "verify signature for msg byte array.
-  return true if valid signature and false if not."
+  "Verify signature for msg byte array.
+
+  Return true if valid signature and false if not."
   [^Ed25519Signer signer msg-bytes signature]
   (.update signer msg-bytes 0 (alength msg-bytes))
   (.verifySignature signer signature))
+
+(defn authentic?
+  "Checks whether a signature is authentic, given a message and a public key.
+
+  This function has 2 arities: a general purpose one that simply delegates to a crypto library and one tailored to what Discord provides.
+
+  The general purpose arity takes a signature, a message and a public key (all of which must be byte arrays) and checks the authenticity.
+  The other arity takes a signature (byte array or hex string), public key (byte array or hex string), body (byte array or string), timestamp (byte array or string).
+
+  It combines timestamp and body and uses that as the message.
+
+  Returns `true` if the message is authentic, `false` if not."
+  ([signature-bytes message-bytes public-key-bytes]
+   (verify (new-verifier (Ed25519PublicKeyParameters. public-key-bytes 0))
+           message-bytes
+           signature-bytes))
+  ([signature body timestamp public-key charset-name]
+   (if-let-all [signature-bytes (cond-> signature (not (bytes? signature)) hex->bytes)
+                public-key-bytes (cond-> public-key (not (bytes? public-key)) hex->bytes)
+                body-string (if (bytes? body) (slurp body) body)
+                timestamp-string (if (bytes? timestamp) (slurp timestamp) timestamp)
+                message-bytes (encode (str timestamp-string body-string) charset-name)]
+     (authentic? signature-bytes message-bytes public-key-bytes)
+     false)))
 
 (defn verify-request
   "verify discord payload with app public-key,

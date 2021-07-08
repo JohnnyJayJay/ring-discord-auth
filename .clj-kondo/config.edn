@@ -1,0 +1,1 @@
+{:lint-as {ring-discord-auth.validation/if-let-all clojure.core/let}}
