@@ -99,7 +99,6 @@
                 [(hex (bit-shift-right v 4)) (hex (bit-and v 0x0F))]))]
       (str/join (mapcat hexify-byte byte-array)))))
 
-
 (defn new-verifier
   "Return new instance of `Ed25519Signer` initialized by public key."
   [public-key]
