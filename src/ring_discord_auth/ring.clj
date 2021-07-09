@@ -40,8 +40,8 @@
          :as request}]
        (if (= request-method :post)
          (core/if-let-all [sig-bytes (some-> signature core/hex->bytes)
-                                 time-bytes (some-> timestamp (core/encode character-encoding))
-                                 body-bytes (some-> body core/read-all-bytes)]
+                           time-bytes (some-> timestamp (core/encode character-encoding))
+                           body-bytes (some-> body core/read-all-bytes)]
            (if (core/authentic? sig-bytes body-bytes time-bytes public-key character-encoding)
              (handler (assoc request :body (ByteArrayInputStream. body-bytes)))
              {:status 401 :headers default-headers :body "Signature was not authentic."})
