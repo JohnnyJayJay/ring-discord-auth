@@ -16,13 +16,13 @@
 
       (is (instance? Ed25519Signer
                      (core/public-key->signer-verifier (-> public-key-str
-                                                                 core/hex->bytes
-                                                                 (Ed25519PublicKeyParameters. 0)))))
+                                                           core/hex->bytes
+                                                           (Ed25519PublicKeyParameters. 0)))))
       (is (instance? Ed25519Signer
                      (core/public-key->signer-verifier (-> public-key-str
-                                                                 core/hex->bytes
-                                                                 (Ed25519PublicKeyParameters. 0)
-                                                                 core/new-verifier))))
+                                                           core/hex->bytes
+                                                           (Ed25519PublicKeyParameters. 0)
+                                                           core/new-verifier))))
       (is (nil? (core/public-key->signer-verifier 1)))
       (is (nil? (core/public-key->signer-verifier nil))))))
 
@@ -35,30 +35,30 @@
         signature (->> (str timestamp body) .getBytes (test-helpers/sign signer))]
     (testing "authentic? should check signature vs public-key, timestamp and body"
       (is (= true
-             (core/authentic? (core/bytes->hex signature)
-                                    body
-                                    timestamp
-                                    (core/bytes->hex public-key)
-                                    "utf8"))
+             (core/authentic? (test-helpers/bytes->hex signature)
+                              body
+                              timestamp
+                              (test-helpers/bytes->hex public-key)
+                              "utf8"))
           "checks with conversions.")
       (is (= true
              (core/authentic? signature
-                                    (.getBytes body)
-                                    (.getBytes timestamp)
-                                    public-key
-                                    "utf8"))
+                              (.getBytes body)
+                              (.getBytes timestamp)
+                              public-key
+                              "utf8"))
           "checks without conversions.")
       (is (= false
-             (core/authentic? (core/bytes->hex signature)
-                                    (str body "hacks-to-fail")
-                                    timestamp
-                                    (core/bytes->hex public-key)
-                                    "utf8"))
+             (core/authentic? (test-helpers/bytes->hex signature)
+                              (str body "hacks-to-fail")
+                              timestamp
+                              (test-helpers/bytes->hex public-key)
+                              "utf8"))
           "checks with conversions.")
       (is (= false
              (core/authentic? signature
-                                    (.getBytes (str body "hacks-to-fail"))
-                                    (.getBytes timestamp)
-                                    public-key
-                                    "utf8"))
+                              (.getBytes (str body "hacks-to-fail"))
+                              (.getBytes timestamp)
+                              public-key
+                              "utf8"))
           "checks without conversions."))))

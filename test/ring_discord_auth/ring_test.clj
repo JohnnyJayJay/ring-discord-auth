@@ -1,7 +1,6 @@
 (ns ring-discord-auth.ring-test
   (:require [clojure.java.io :as io]
             [clojure.test :refer [deftest is testing]]
-            [ring-discord-auth.core :as core]
             [ring-discord-auth.ring :as interceptor]
             [ring-discord-auth.test-helpers :as test-helpers]))
 
@@ -18,11 +17,11 @@
 (deftest verify-request-test
   (let [key-pair (test-helpers/generate-keypair)
         signer (test-helpers/new-signer (:private key-pair))
-        public-key-hex (core/bytes->hex (.getEncoded (:public key-pair)))
+        public-key-hex (test-helpers/bytes->hex (.getEncoded (:public key-pair)))
         interceptor-fn (interceptor/wrap-authenticate identity public-key-hex)
         timestamp "1625603592"
         body "this should be a json."
-        signature (->> (str timestamp body) .getBytes (test-helpers/sign signer) core/bytes->hex)]
+        signature (->> (str timestamp body) .getBytes (test-helpers/sign signer) test-helpers/bytes->hex)]
     (testing "interceptor should check signature vs public-key, timestamp and body"
       (is (= {:request-method :post :character-encoding "utf8"}
              (-> (interceptor-fn (build-request timestamp

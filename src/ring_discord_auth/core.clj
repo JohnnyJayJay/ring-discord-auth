@@ -1,6 +1,5 @@
 (ns ring-discord-auth.core
   (:require [clojure.java.io :as io]
-            [clojure.string :as str]
             [clojure.test :refer [is]])
   (:import (java.io ByteArrayOutputStream InputStream)
            (java.nio ByteBuffer CharBuffer)
@@ -8,21 +7,6 @@
            (java.util Arrays)
            (org.bouncycastle.crypto.params Ed25519PublicKeyParameters)
            (org.bouncycastle.crypto.signers Ed25519Signer)))
-
-(defmacro examples
-  "Macro to generate illustrative tests for a function based on input-output pairs.
-
-  `f` is the function to test.
-  `equals` is the function used to compare the expected and actual result.
-  Each example call is a sequence where the first n - 1 items are the inputs and the last item is the expected output."
-  {:style/indent 1}
-  [f equals & example-calls]
-  `(fn []
-     ~@(for [call example-calls
-             :let [in (drop-last call)
-                   out (last call)
-                   out-ev (eval out)]]
-         `(is (~equals (~f ~@in) ~out)))))
 
 (defmacro if-let-all
   "Utility-macro - like `if-let`, but with multiple bindings that are all tested."
@@ -39,6 +23,39 @@
            `(if-let-all ~(subvec bindings 2) ~then ~else)
            then)
         ~else))))
+
+(defmacro examples
+  "Macro to generate illustrative tests for a function based on input-output pairs.
+
+  `f` is the function to test.
+  `equals` is the function used to compare the expected and actual result.
+  Each example call is a sequence where the first n - 1 items are the inputs and the last item is the expected output."
+  {:style/indent 1}
+  [f equals & example-calls]
+  `(fn []
+     ~@(for [call example-calls
+             :let [in (drop-last call)
+                   out (last call)
+                   out-ev (eval out)]]
+         `(is (~equals (~f ~@in) ~out)))))
+
+(defn hex->bytes
+  "Converts the given string representing a hexadecimal number to a byte array.
+
+  Each byte in the resulting array comes from 2 digits in the string.
+  If the string cannot be converted, returns `nil`"
+  {:test (examples hex->bytes Arrays/equals
+           ["68c252fa74eb9b97" #_=> (byte-array [0x68 0xc2 0x52 0xfa 0x74 0xeb 0x9b 0x97])]
+           ["123" #_=> (byte-array [0x12 0x03])]
+           ["garbage" #_=> nil])}
+  ^bytes [^String hex-str]
+  (let [len (count hex-str)
+        result (byte-array (quot (inc len) 2))]
+    (try
+      (doseq [[i hex-part] (map-indexed vector (map (partial apply str) (partition-all 2 hex-str)))]
+        (aset result i (unchecked-byte (Short/parseShort hex-part 16))))
+      result
+      (catch NumberFormatException _ nil))))
 
 (defn read-all-bytes
   "Reads all bytes from either an `InputStream` or a `ByteBuffer`.
@@ -76,28 +93,9 @@
     (when (.canEncode encoder str)
       (read-all-bytes (.encode encoder (CharBuffer/wrap str))))))
 
-(defn hex->bytes
-  "Converts the given string representing a hexadecimal number to a byte array.
-  Each byte in the resulting array comes from 2 digits in the string.
 
-  If the string cannot be converted, returns `nil`"
-  ^bytes [^String hex-str]
-  (let [len (count hex-str)
-        result (byte-array (quot (inc len) 2))]
-    (try
-      (doseq [[i hex-part] (map-indexed vector (map (partial apply str) (partition-all 2 hex-str)))]
-        (aset result i (unchecked-byte (Short/parseShort hex-part 16))))
-      result
-      (catch NumberFormatException _ nil))))
 
-(defn bytes->hex
-  "Convert byte array to hex string."
-  [^bytes byte-array]
-  (let [hex [\0 \1 \2 \3 \4 \5 \6 \7 \8 \9 \a \b \c \d \e \f]]
-    (letfn [(hexify-byte [b]
-              (let [v (bit-and b 0xFF)]
-                [(hex (bit-shift-right v 4)) (hex (bit-and v 0x0F))]))]
-      (str/join (mapcat hexify-byte byte-array)))))
+
 
 (defn new-verifier
   "Return new instance of `Ed25519Signer` initialized by public key."
