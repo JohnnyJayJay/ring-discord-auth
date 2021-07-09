@@ -1,46 +1,64 @@
 (ns ring-discord-auth.core-test
-  (:require [clojure.java.io :as io]
-            [clojure.test :refer [deftest is testing]]
-            [ring-discord-auth.core :as interceptor]
-            [ring-discord-auth.validation :as validation]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [ring-discord-auth.core :as core]
+            [ring-discord-auth.test-helpers :as test-helpers])
+  (:import (org.bouncycastle.crypto.params Ed25519PublicKeyParameters)
+           (org.bouncycastle.crypto.signers Ed25519Signer)))
 
-(defn build-request
-  ([timestamp body signature]
-   (build-request timestamp body signature :post))
-  ([timestamp body signature method]
-   {:request-method method
-    :headers {"x-signature-ed25519" signature
-              "x-signature-timestamp" timestamp}
-    :body (io/input-stream (.getBytes body))
-    :character-encoding "utf8"}))
+(deftest public-key-verifier-test
+  (let [public-key-str "e421dceefff3a9d008b7898fcc0974813201800419d72f36d51e010d6a0acb71"]
+    (testing "public-key->verifier should convert all possible types or return nil"
+      (is (instance? Ed25519Signer
+                     (core/public-key->signer-verifier public-key-str)))
 
-(deftest verify-request-test
-  (let [key-pair (validation/generate-keypair)
-        signer (validation/new-signer (:private key-pair))
-        public-key-hex (validation/bytes->hex (.getEncoded (:public key-pair)))
-        interceptor-fn (interceptor/wrap-authenticate identity public-key-hex)
+      (is (instance? Ed25519Signer
+                     (core/public-key->signer-verifier (core/hex->bytes public-key-str))))
+
+      (is (instance? Ed25519Signer
+                     (core/public-key->signer-verifier (-> public-key-str
+                                                                 core/hex->bytes
+                                                                 (Ed25519PublicKeyParameters. 0)))))
+      (is (instance? Ed25519Signer
+                     (core/public-key->signer-verifier (-> public-key-str
+                                                                 core/hex->bytes
+                                                                 (Ed25519PublicKeyParameters. 0)
+                                                                 core/new-verifier))))
+      (is (nil? (core/public-key->signer-verifier 1)))
+      (is (nil? (core/public-key->signer-verifier nil))))))
+
+(deftest authentic-test
+  (let [key-pair (test-helpers/generate-keypair)
+        signer (test-helpers/new-signer (:private key-pair))
+        public-key (.getEncoded (:public key-pair))
         timestamp "1625603592"
         body "this should be a json."
-        signature (->> (str timestamp body) .getBytes (validation/sign signer) validation/bytes->hex)]
-    (testing "interceptor should check signature vs public-key, timestamp and body"
-      (is (= {:request-method :post :character-encoding "utf8"}
-             (-> (interceptor-fn (build-request timestamp
-                                                body
-                                                signature))
-                 (select-keys [:request-method :character-encoding]))))
-      (is (= {:status 401, :headers {"Content-Type" "text/plain", "Allow" "POST"}, :body "Signature was not authentic."}
-             (-> (interceptor-fn (build-request timestamp
-                                                (str body "hackedbody")
-                                                signature))
-                 (select-keys [:status :headers :body]))))
-      (is (= {:status 400, :headers {"Content-Type" "text/plain", "Allow" "POST"}, :body "Missing body, signature or timestamp."}
-             (-> (interceptor-fn (build-request nil
-                                                ""
-                                                nil))
-                 (select-keys [:status :headers :body]))))
-      (is (= {:status 405, :headers {"Content-Type" "text/plain", "Allow" "POST"}, :body "Only POST requests are allowed"}
-             (-> (interceptor-fn (build-request nil
-                                                ""
-                                                nil
-                                                :get))
-                 (select-keys [:status :headers :body])))))))
+        signature (->> (str timestamp body) .getBytes (test-helpers/sign signer))]
+    (testing "authentic? should check signature vs public-key, timestamp and body"
+      (is (= true
+             (core/authentic? (core/bytes->hex signature)
+                                    body
+                                    timestamp
+                                    (core/bytes->hex public-key)
+                                    "utf8"))
+          "checks with conversions.")
+      (is (= true
+             (core/authentic? signature
+                                    (.getBytes body)
+                                    (.getBytes timestamp)
+                                    public-key
+                                    "utf8"))
+          "checks without conversions.")
+      (is (= false
+             (core/authentic? (core/bytes->hex signature)
+                                    (str body "hacks-to-fail")
+                                    timestamp
+                                    (core/bytes->hex public-key)
+                                    "utf8"))
+          "checks with conversions.")
+      (is (= false
+             (core/authentic? signature
+                                    (.getBytes (str body "hacks-to-fail"))
+                                    (.getBytes timestamp)
+                                    public-key
+                                    "utf8"))
+          "checks without conversions."))))
