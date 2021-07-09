@@ -17,7 +17,7 @@ Below is an example of a minimal Discord app that uses the library. Here, a sync
 ``` clojure
 (ns example.core
   (:gen-class)
-  (:require [ring-discord-auth.core :refer [wrap-authenticate]]
+  (:require [ring-discord-auth.ring :refer [wrap-authenticate]]
             [ring.middleware.json :refer [wrap-json-body wrap-json-response]]
             [ring.util.response :refer [response]]
             [org.http-kit.server :as http]))
@@ -41,7 +41,7 @@ Below is an example of a minimal Discord app that uses the library. Here, a sync
 
 Note that `wrap-authenticate` requires access to the raw, unmodified body and must therefore be run before `wrap-json-body`.
 
-Or you can use the `ring-discord-auth.validation/verify-request` directly.
+Or you can use the `ring-discord-auth.core/authentic?` directly.
 
 ```clojure
 (ns example.core

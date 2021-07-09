@@ -46,9 +46,9 @@
   If an `InputStream` is provided, it will be consumed, but not closed.
   Returns its result as a *new* byte array."
   {:test (examples read-all-bytes Arrays/equals
-                   [(ByteBuffer/allocate 0) #_=> (byte-array 0)]
-                   [(io/input-stream (byte-array [0x12 0xab 0x4f])) #_=> (byte-array [0x12 0xab 0x4f])]
-                   [(ByteBuffer/wrap (byte-array [0x67 0x2a 0x4b 0x23 0x5c]) 1 2) #_=> (byte-array [0x2a 0x4b])])}
+           [(ByteBuffer/allocate 0) #_=> (byte-array 0)]
+           [(io/input-stream (byte-array [0x12 0xab 0x4f])) #_=> (byte-array [0x12 0xab 0x4f])]
+           [(ByteBuffer/wrap (byte-array [0x67 0x2a 0x4b 0x23 0x5c]) 1 2) #_=> (byte-array [0x2a 0x4b])])}
   ^bytes [input]
   (condp instance? input
     InputStream (let [bos (ByteArrayOutputStream.)]
@@ -68,13 +68,13 @@
 
   Returns `nil` if the charset is not available or if it doesn't support encoding."
   {:test (examples encode Arrays/equals
-                   ["Hello, world!", "utf8" #_=> (byte-array [0x48 0x65 0x6c 0x6c 0x6f 0x2c 0x20 0x77 0x6f 0x72 0x6c 0x64 0x21])]
-                   ["Another one", "unknown?" #_=> nil])}
+           ["Hello, world!", "utf8" #_=> (byte-array [0x48 0x65 0x6c 0x6c 0x6f 0x2c 0x20 0x77 0x6f 0x72 0x6c 0x64 0x21])]
+           ["Another one", "unknown?" #_=> nil])}
   ^bytes [^String str ^String charset-name]
   (if-let-all [^Charset cs (try (Charset/forName charset-name) (catch UnsupportedCharsetException _ nil) (catch IllegalCharsetNameException _ nil))
                ^CharsetEncoder encoder (try (.newEncoder cs) (catch UnsupportedOperationException _ nil))]
-              (when (.canEncode encoder str)
-                (read-all-bytes (.encode encoder (CharBuffer/wrap str))))))
+    (when (.canEncode encoder str)
+      (read-all-bytes (.encode encoder (CharBuffer/wrap str))))))
 
 (defn hex->bytes
   "Converts the given string representing a hexadecimal number to a byte array.
