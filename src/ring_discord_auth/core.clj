@@ -93,10 +93,6 @@
     (when (.canEncode encoder str)
       (read-all-bytes (.encode encoder (CharBuffer/wrap str))))))
 
-
-
-
-
 (defn new-verifier
   "Return new instance of `Ed25519Signer` initialized by public key."
   [public-key]
@@ -105,10 +101,11 @@
     signer))
 
 (defn verify
-  "Verify signature for msg byte array.
-  Takes a signature, a message and a public key Ed25519Signer verifier obtained by [[new-verifier]]) and checks the authenticity.
+  "Verify signature for a message byte array.
 
-  Returns `true` if valid signature and `false` if not."
+  Takes a signature, a message and a public key `Ed25519Signer` verifier obtained by [[new-verifier]] and checks the authenticity.
+
+  Returns `true` if the signature is valid and `false` if not."
   [^Ed25519Signer signer ^bytes msg-bytes signature]
   (.update signer msg-bytes 0 (alength msg-bytes))
   (.verifySignature signer signature))
@@ -116,7 +113,7 @@
 (defn public-key->signer-verifier
   "Takes a public key as hex string, byte array, Ed25519PublicKeyParameters or Ed25519Signer.
 
-  Return instance of `Ed25519Signer`"
+  Returns an instance of `Ed25519Signer`."
   [public-key]
   (cond
     (string? public-key) (-> public-key hex->bytes (Ed25519PublicKeyParameters. 0) new-verifier)
@@ -139,7 +136,7 @@
       message-bytes)))
 
 (defn authentic?
-  "Checks whether a signature is authentic, given a message and a public key.
+  "Checks whether a signature from a Discord interaction is authentic.
 
   Takes a signature (byte array or hex string), public key (byte array, hex string or verifier), body (byte array or string), timestamp (byte array or string).
   It combines timestamp and body and uses that as the message.
