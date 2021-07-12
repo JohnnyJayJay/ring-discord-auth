@@ -1,7 +1,7 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-### [1.0.0]
+## [1.0.0]
 ### Added
 - Unit tests
 - GitHub test action
@@ -16,7 +16,7 @@ All notable changes to this project will be documented in this file. This change
 ### Removed
 - Simple `authentic?` arity (replaced by `verify` function)
 
-### 0.2.1
+## 0.2.1
 ### Changed
 - New Licence: MIT
 
