@@ -109,7 +109,7 @@
   Takes a signature, a message and a public key Ed25519Signer verifier obtained by [[new-verifier]]) and checks the authenticity.
 
   Returns `true` if valid signature and `false` if not."
-  [^Ed25519Signer signer msg-bytes signature]
+  [^Ed25519Signer signer ^bytes msg-bytes signature]
   (.update signer msg-bytes 0 (alength msg-bytes))
   (.verifySignature signer signature))
 
@@ -131,7 +131,7 @@
     (string? body) (encode charset)))
 
 (defn- combine-bytes
-  [timestamp-bytes body-bytes]
+  [^bytes timestamp-bytes ^bytes body-bytes]
   (if-let [message-bytes (byte-array (+ (alength timestamp-bytes) (alength body-bytes)))]
     (do
       (System/arraycopy timestamp-bytes 0 message-bytes 0 (alength timestamp-bytes))
