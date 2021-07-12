@@ -6,7 +6,7 @@ This does not provide support for Discord's OAuth2.
 
 ## Installation
 
-Then, you can add the library through the dependency below.
+You can add the library through the dependency below.
 
 [![Clojars Project](https://img.shields.io/clojars/v/com.github.johnnyjayjay/ring-discord-auth.svg)](https://clojars.org/com.github.johnnyjayjay/ring-discord-auth)
 
