@@ -1,12 +1,12 @@
 (ns ring-discord-auth.core
-  "Core namespace containing functions to handle bytes, encodings and Discord authentication"
   (:require [clojure.java.io :as io]
-            [caesium.crypto.sign :as sign]
             [clojure.test :refer [is]])
-  (:import (java.nio.charset StandardCharsets Charset UnsupportedCharsetException IllegalCharsetNameException CharsetEncoder)
-           (java.util Arrays)
+  (:import (java.io ByteArrayOutputStream InputStream)
            (java.nio ByteBuffer CharBuffer)
-           (java.io ByteArrayOutputStream ByteArrayInputStream InputStream)))
+           (java.nio.charset Charset UnsupportedCharsetException IllegalCharsetNameException CharsetEncoder)
+           (java.util Arrays)
+           (org.bouncycastle.crypto.params Ed25519PublicKeyParameters)
+           (org.bouncycastle.crypto.signers Ed25519Signer)))
 
 (defmacro if-let-all
   "Utility-macro - like `if-let`, but with multiple bindings that are all tested."
@@ -50,7 +50,6 @@
            ["garbage" #_=> nil])}
   ^bytes [^String hex-str]
   (let [len (count hex-str)
-
         result (byte-array (quot (inc len) 2))]
     (try
       (doseq [[i hex-part] (map-indexed vector (map (partial apply str) (partition-all 2 hex-str)))]
@@ -94,75 +93,63 @@
     (when (.canEncode encoder str)
       (read-all-bytes (.encode encoder (CharBuffer/wrap str))))))
 
+
+
+
+
+(defn new-verifier
+  "Return new instance of `Ed25519Signer` initialized by public key."
+  [public-key]
+  (let [signer (Ed25519Signer.)]
+    (.init signer false public-key)
+    signer))
+
+(defn verify
+  "Verify signature for msg byte array.
+  Takes a signature, a message and a public key Ed25519Signer verifier obtained by [[new-verifier]]) and checks the authenticity.
+
+  Returns `true` if valid signature and `false` if not."
+  [^Ed25519Signer signer msg-bytes signature]
+  (.update signer msg-bytes 0 (alength msg-bytes))
+  (.verifySignature signer signature))
+
+(defn public-key->signer-verifier
+  "Takes a public key as hex string, byte array, Ed25519PublicKeyParameters or Ed25519Signer.
+
+  Return instance of `Ed25519Signer`"
+  [public-key]
+  (cond
+    (string? public-key) (-> public-key hex->bytes (Ed25519PublicKeyParameters. 0) new-verifier)
+    (bytes? public-key) (-> public-key (Ed25519PublicKeyParameters. 0) new-verifier)
+    (instance? Ed25519PublicKeyParameters public-key) (-> public-key new-verifier)
+    (instance? Ed25519Signer public-key) public-key
+    :else nil))
+
+(defn- if-str->bytes
+  [body charset]
+  (cond-> body
+    (string? body) (encode charset)))
+
+(defn- combine-bytes
+  [timestamp-bytes body-bytes]
+  (if-let [message-bytes (byte-array (+ (alength timestamp-bytes) (alength body-bytes)))]
+    (do
+      (System/arraycopy timestamp-bytes 0 message-bytes 0 (alength timestamp-bytes))
+      (System/arraycopy body-bytes 0 message-bytes (alength timestamp-bytes) (alength body-bytes))
+      message-bytes)))
+
 (defn authentic?
   "Checks whether a signature is authentic, given a message and a public key.
 
-  This function has 2 arities: a general purpose one that simply delegates to a crypto library and one tailored to what Discord provides.
-
-  The general purpose arity takes a signature, a message and a public key (all of which must be byte arrays) and checks the authenticity.
-
-  The other arity takes a signature (byte array or hex string), public key (byte array or hex string), body (byte array or string), timestamp (byte array or string).
+  Takes a signature (byte array or hex string), public key (byte array, hex string or verifier), body (byte array or string), timestamp (byte array or string).
   It combines timestamp and body and uses that as the message.
 
   Returns `true` if the message is authentic, `false` if not."
-  ([signature-bytes message-bytes public-key-bytes]
-   (try
-     (sign/verify signature-bytes message-bytes public-key-bytes)
-     true
-     (catch RuntimeException _ false)))
-  ([signature body timestamp public-key charset-name]
-   (if-let-all [signature-bytes (cond-> signature (not (bytes? signature)) hex->bytes)
-                public-key-bytes (cond-> public-key (not (bytes? public-key)) hex->bytes)
-                ^bytes body-bytes (cond-> body (string? body) (encode body charset-name))
-                ^bytes timestamp-bytes (cond-> timestamp (string? timestamp) (encode timestamp charset-name))
-                message-bytes (byte-array (+ (alength timestamp-bytes) (alength body-bytes)))]
-     (do
-       (System/arraycopy timestamp-bytes 0 message-bytes 0 (alength timestamp-bytes))
-       (System/arraycopy body-bytes 0 message-bytes (alength timestamp-bytes) (alength body-bytes))
-       (authentic? signature-bytes message-bytes public-key-bytes))
-     false)))
-
-(def signature-header "x-signature-ed25519")
-(def timestamp-header "x-signature-timestamp")
-(def default-charset "utf8")
-
-(def default-headers {"Content-Type" "text/plain"
-                      "Allow" "POST"})
-
-(defn wrap-authenticate
-  "Ring middleware to authenticate incoming requests according to the Discord specification.
-
-  This means:
-  - If request method is not POST, respond with status 405 (Method Not Allowed)
-  - Get body from the request as well as [[signature-header]] and [[timestamp-header]] from the headers
-  - If any of the above is not present, respond with status 400 (Bad Request)
-  - Check the parameters for authenticity as defined by Discord
-    - If authentic, delegate to the `handler` with a restored body
-    - If not authentic, respond with status 401 (Unauthorized)
-
-  The `public-key` is the public key of the corresponding Discord app. It may be given as a String or byte array.
-  This middleware must be in the hierarchy **before** the body is processed.
-
-  This middleware supports both synchronous and asynchronous handlers."
-  [handler public-key]
-  (let [public-key (cond-> public-key (string? public-key) hex->bytes)]
-    (fn
-      ([request respond raise]
-       (let [validator (wrap-authenticate identity public-key)
-             result (validator request)]
-         (if (:status result)
-           (respond result)
-           (handler result respond raise))))
-      ([{:keys [body character-encoding request-method]
-         {signature signature-header timestamp timestamp-header} :headers
-         :or {character-encoding default-charset}
-         :as request}]
-       (if (= request-method :post)
-         (if-let-all [sig-bytes (some-> signature hex->bytes)
-                      time-bytes (some-> timestamp (encode character-encoding))
-                      body-bytes (some-> body read-all-bytes)]
-           (if (authentic? sig-bytes body-bytes time-bytes public-key character-encoding)
-             (handler (assoc request :body (ByteArrayInputStream. body-bytes)))
-             {:status 401 :headers default-headers :body "Signature was not authentic."})
-           {:status 400 :headers default-headers :body "Missing body, signature or timestamp."})
-         {:status 405 :headers default-headers :body "Only POST requests are allowed"})))))
+  [signature body timestamp public-key charset-name]
+  (if-let-all [signature-bytes (cond-> signature (not (bytes? signature)) hex->bytes)
+               public-key-signer (public-key->signer-verifier public-key)
+               ^bytes body-bytes (if-str->bytes body charset-name)
+               ^bytes timestamp-bytes (if-str->bytes timestamp charset-name)
+               message-bytes (combine-bytes timestamp-bytes body-bytes)]
+    (verify public-key-signer message-bytes signature-bytes)
+    false))
