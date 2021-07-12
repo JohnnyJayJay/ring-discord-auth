@@ -1,6 +1,6 @@
 (ns ring-discord-auth.ring
   "Core namespace containing functions to handle bytes, encodings and Discord authentication"
-  (:require [ring-discord-auth.core :as core])
+  (:require [ring-discord-auth.core :as core :refer [if-let-all]])
   (:import (java.io ByteArrayInputStream)))
 
 (def signature-header "x-signature-ed25519")
@@ -21,12 +21,12 @@
     - If authentic, delegate to the `handler` with a restored body
     - If not authentic, respond with status 401 (Unauthorized)
 
-  The `public-key` is the public key of the corresponding Discord app. It may be given as a String or byte array.
+  The `public-key` is the public key of the corresponding Discord app. It may be given as something that is accepted by [[core/public-key->signer-verifier]].
   This middleware must be in the hierarchy **before** the body is processed.
 
   This middleware supports both synchronous and asynchronous handlers."
   [handler public-key]
-  (let [public-key (cond-> public-key (string? public-key) core/hex->bytes)]
+  (let [public-key (core/public-key->signer-verifier)]
     (fn
       ([request respond raise]
        (let [validator (wrap-authenticate identity public-key)
@@ -39,9 +39,9 @@
          :or {character-encoding default-charset}
          :as request}]
        (if (= request-method :post)
-         (core/if-let-all [sig-bytes (some-> signature core/hex->bytes)
-                           time-bytes (some-> timestamp (core/encode character-encoding))
-                           body-bytes (some-> body core/read-all-bytes)]
+         (if-let-all [sig-bytes (some-> signature core/hex->bytes)
+                      time-bytes (some-> timestamp (core/encode character-encoding))
+                      body-bytes (some-> body core/read-all-bytes)]
            (if (core/authentic? sig-bytes body-bytes time-bytes public-key character-encoding)
              (handler (assoc request :body (ByteArrayInputStream. body-bytes)))
              {:status 401 :headers default-headers :body "Signature was not authentic."})
