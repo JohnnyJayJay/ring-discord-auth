@@ -148,8 +148,8 @@
   [signature body timestamp public-key charset-name]
   (if-let-all [signature-bytes (cond-> signature (not (bytes? signature)) hex->bytes)
                public-key-signer (public-key->signer-verifier public-key)
-               ^bytes body-bytes (if-str->bytes body charset-name)
-               ^bytes timestamp-bytes (if-str->bytes timestamp charset-name)
+               body-bytes (if-str->bytes body charset-name)
+               timestamp-bytes (if-str->bytes timestamp charset-name)
                message-bytes (combine-bytes timestamp-bytes body-bytes)]
     (verify public-key-signer message-bytes signature-bytes)
     false))
