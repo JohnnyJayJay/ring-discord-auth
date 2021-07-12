@@ -1,7 +1,7 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-### [Unreleased]
+### [1.0.0]
 ### Added
 - Unit tests
 - GitHub test action
@@ -28,4 +28,5 @@ All notable changes to this project will be documented in this file. This change
 ### Added
 - Initial project state
 
+[1.0.0]: https://github.com/JohnnyJayJay/ring-discord-auth/tree/1.0.0
 [Unreleased]: https://github.com/JohnnyJayJay/ring-discord-auth/tree/develop
