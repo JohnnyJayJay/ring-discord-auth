@@ -1,8 +1,9 @@
 # ring-discord-auth
 
-`ring-discord-auth` provides functions to verify ED-25519 signatures sent by Discord when using [webhook-based interactions](https://discord.com/developers/docs/interactions/slash-commands#receiving-an-interaction).
+`ring-discord-auth` provides functions to verify ED-25519 signatures sent by Discord when using [webhook-based interactions](https://discord.com/developers/docs/interactions/slash-commands#receiving-an-interaction).\
+Despite its name, it need not be used with ring; the library provides general functions to integrate the authentication process into any system.
 
-This does not provide support for Discord's OAuth2.
+This library does not provide support for Discord's OAuth2.
 
 ## Installation
 
