@@ -1,5 +1,5 @@
-(defproject com.github.johnnyjayjay/ring-discord-auth "0.2.1"
-  :description "Fast and secure ring middleware to verify ED-25519-signed Discord interactions"
+(defproject com.github.johnnyjayjay/ring-discord-auth "1.0.0"
+  :description "Fast and secure functions and ring middleware to verify ED-25519-signed Discord interactions"
   :url "https://github.com/JohnnyJayJay/ring-discord-auth"
   :license {:name "MIT License"
             :url "https://mit-license.org/"}
