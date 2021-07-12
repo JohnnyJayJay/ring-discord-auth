@@ -1,8 +1,31 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## [Unreleased]
+### [Unreleased]
+### Added
+- Unit tests
+- GitHub test action
+- `ring-discord-auth.core/verify` as a replacement for plain signature validation in `authentic?`
+- `ring-discord-auth.core/new-verifier` and `public-key->signer-verifier` for convenience with the new library
+- `authentic?` accepts an `Ed25519Signer` as public key
+
+### Changed
+- `wrap-authenticate` is now in `ring-discord-auth.ring`
+- Use of bouncycastle library instead of caesium (native libsodium is not required anymore)
+
+### Removed
+- Simple `authentic?` arity (replaced by `verify` function)
+
+### 0.2.1
+### Changed
+- New Licence: MIT
+
+## 0.2.0
+### Added 
+- Support for async ring handlers in `wrap-authenticate` middleware
+
+## 0.1.0
 ### Added
 - Initial project state
 
-[Unreleased]: https://github.com/JohnnyJayJay/ring-discord-auth/tree/main
+[Unreleased]: https://github.com/JohnnyJayJay/ring-discord-auth/tree/develop
