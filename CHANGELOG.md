@@ -1,7 +1,7 @@
 # Change Log
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
-## [Unreleased]
+## [1.0.1]
 ### Fixed
 - `wrap-authenticate` now accepts the same values for `public-key` as `authentic?`
 
@@ -33,4 +33,5 @@ All notable changes to this project will be documented in this file. This change
 - Initial project state
 
 [1.0.0]: https://github.com/JohnnyJayJay/ring-discord-auth/tree/1.0.0
+[1.0.1]: https://github.com/JohnnyJayJay/ring-discord-auth/tree/1.0.1
 [Unreleased]: https://github.com/JohnnyJayJay/ring-discord-auth/tree/develop
