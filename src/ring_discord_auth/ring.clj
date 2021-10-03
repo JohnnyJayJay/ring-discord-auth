@@ -26,7 +26,7 @@
 
   This middleware supports both synchronous and asynchronous handlers."
   [handler public-key]
-  (let [public-key (core/public-key->signer-verifier)]
+  (let [public-key (core/public-key->signer-verifier public-key)]
     (fn
       ([request respond raise]
        (let [validator (wrap-authenticate identity public-key)
